@@ -67,7 +67,7 @@ test('pathing near close nodes in a different group', (t) => {
   const pathfinding = new Pathfinding();
 
   const geometry = new THREE.Geometry();
-  // Make a geometry that looks something like https://i.imgur.com/vUPAwB5.png
+  // Make a geometry that looks something like ./diagrams/close-groups.png
   geometry.vertices.push(
     new THREE.Vector3(  0,  0,  0  ),
     new THREE.Vector3(  1,  0,  0  ),
@@ -77,7 +77,7 @@ test('pathing near close nodes in a different group', (t) => {
     new THREE.Vector3(  1,  0,  2  )
   );
   geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
-  geometry.faces.push( new THREE.Face3( 3, 4, 5 ) );
+  geometry.faces.push( new THREE.Face3( 3, 5, 4 ) );
 
   const zone = Pathfinding.createZone(geometry);
   pathfinding.setZoneData(ZONE, zone);
