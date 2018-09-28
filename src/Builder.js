@@ -14,12 +14,6 @@ class Builder {
 
     const zone = {};
 
-    navMesh.vertices.forEach((v) => {
-      v.x = Utils.roundNumber(v.x, 2);
-      v.y = Utils.roundNumber(v.y, 2);
-      v.z = Utils.roundNumber(v.z, 2);
-    });
-
     zone.vertices = navMesh.vertices;
 
     const groups = this._buildPolygonGroups(navMesh);
@@ -46,10 +40,6 @@ class Builder {
 
         // Build a portal list to each neighbour
         const portals = p.neighbours.map((n) => this._getSharedVerticesInOrder(p, n));
-
-        p.centroid.x = Utils.roundNumber(p.centroid.x, 2);
-        p.centroid.y = Utils.roundNumber(p.centroid.y, 2);
-        p.centroid.z = Utils.roundNumber(p.centroid.z, 2);
 
         newGroup.push({
           id: findPolygonIndex(group, p),
