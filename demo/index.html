@@ -15,7 +15,8 @@
 			overflow: hidden;
 		}
 
-		.info {
+		header {
+			box-sizing: border-box;
 			padding: 1em;
 			width: 100%;
 			position: absolute;
@@ -23,10 +24,24 @@
 			font-size: 14px;
 		}
 
-		.info p {
+		header h1 {
+			font-size: 1.5em;
+			margin-bottom: 0.5em;
+		}
+
+		header p {
 			padding: 0;
-			margin: 0;
-			margin-bottom: 0.1em;
+			margin: 1em 0;
+			line-height: 1.4em;
+		}
+
+		header a,
+		header a:visited {
+			color: #FFFFFF;
+		}
+
+		.swatches {
+			line-height: 1.4em;
 		}
 
 		.swatch {
@@ -35,63 +50,78 @@
 			height: 1em;
 			vertical-align: top;
 			margin: 0.1em;
-			border: 1px solid white;
+			border-radius: 2px;
 		}
 	</style>
 
 	<body>
 
-		<script src="../node_modules/three/build/three.js"></script>
-		<script src="../node_modules/three/examples/js/controls/OrbitControls.js"></script>
+		<script src="https://cdn.rawgit.com/mrdoob/three.js/r97/build/three.min.js"></script>
+		<script src="https://cdn.rawgit.com/mrdoob/three.js/r97/examples/js/controls/OrbitControls.js"></script>
 		<script src="../dist/three-pathfinding.umd.js"></script>
 
-		<div class="info">
-			<p>Click anywhere on the level to calculate a path. Meta+Click or Right Click to teleport.</p>
-			<i class="swatch" style="background: #00ff00"></i> start/player
-			<i class="swatch" style="background: #ff0000"></i> target
-			<i class="swatch" style="background: #00ffff"></i> waypoint
-			<i class="swatch" style="background: #ffff00"></i> clamped step
-			<i class="swatch" style="background: #ff00ff"></i> closest node
-		</div>
+		<header>
+			<h1>three-pathfinding</h1>
+
+			<p>
+				<a href="https://github.com/donmccurdy/three-pathfinding">Source</a> •
+				<a href="https://github.com/donmccurdy/three-pathfinding#api">Documentation</a> •
+				Click anywhere on the level to calculate a path. Meta+Click or Right Click to teleport.
+			</p>
+			<div class="swatches">
+				<i class="swatch" style="background: #EE836F;"></i> start/player
+				<i class="swatch" style="background: #DCCB18;"></i> target
+				<i class="swatch" style="background: #00A3AF;"></i> waypoint
+				<i class="swatch" style="background: #DCD3B2;"></i> clamped step
+				<i class="swatch" style="background: #43676B;"></i> closest node
+			</div>
+		</header>
 
 		<script>
 			/* global threePathfinding */
 
+			const Color = {
+				PLAYER: new THREE.Color( 0xEE836F ).convertGammaToLinear( 2.2 ).getHex(),
+				TARGET: new THREE.Color( 0xDCCB18 ).convertGammaToLinear( 2.2 ).getHex(),
+				PATH: new THREE.Color( 0x00A3AF ).convertGammaToLinear( 2.2 ).getHex(),
+				WAYPOINT: new THREE.Color( 0x00A3AF ).convertGammaToLinear( 2.2 ).getHex(),
+				CLAMPED_STEP: new THREE.Color( 0xDCD3B2 ).convertGammaToLinear( 2.2 ).getHex(),
+				CLOSEST_NODE: new THREE.Color( 0x43676B ).convertGammaToLinear( 2.2 ).getHex(),
+
+				GROUND: new THREE.Color( 0x606060 ).convertGammaToLinear( 2.2 ).getHex(),
+				NAVMESH: new THREE.Color( 0xFFFFFF ).convertGammaToLinear( 2.2 ).getHex(),
+			};
+
+			const OFFSET = 0.2;
+
 			THREE.Pathfinding = threePathfinding.Pathfinding;
-			var pathfinder = new THREE.Pathfinding();
+			
+			const pathfinder = new THREE.Pathfinding();
 
-			var container;
+			const clock = new THREE.Clock();
 
-			var camera, scene, renderer, controls;
+			const mouse = new THREE.Vector2();
 
-			var raycaster;
-
-			var clock = new THREE.Clock();
-
-			var mouse = new THREE.Vector2();
-
-			var level;
-
-			var closestNodeMarker = new THREE.Mesh(
+			const closestNodeMarker = new THREE.Mesh(
 				new THREE.BoxGeometry(0.1, 0.8, 0.1),
-				new THREE.MeshBasicMaterial({color: 0xff00ff})
+				new THREE.MeshBasicMaterial({color: Color.CLOSEST_NODE})
 			);
 
-			var clampedStepMarker = new THREE.Mesh(
+			const clampedStepMarker = new THREE.Mesh(
 				new THREE.BoxGeometry(0.1, 1, 0.1),
-				new THREE.MeshBasicMaterial({color: 0xffff00})
+				new THREE.MeshBasicMaterial({color: Color.CLAMPED_STEP})
 			);
+
+			let container;
+
+			let camera, scene, renderer, controls, raycaster;
+
+			let player, target, level;
+
+			let playerNavMeshGroup, pathLines, calculatedPath;
 
 			init();
 			animate();
-
-			var player, target;
-
-			var playerNavMeshGroup;
-
-			var calculatedPath = null;
-
-			var pathLines;
 
 			function init() {
 
@@ -118,7 +148,8 @@
 				var jsonLoader = new THREE.JSONLoader();
 
 				jsonLoader.load( 'meshes/level.js', function( geometry, materials ) {
-					level = new THREE.Mesh(geometry, materials);
+					const levelMat = new THREE.MeshStandardMaterial({color: Color.GROUND, roughness: 1, metalness: 0});
+					level = new THREE.Mesh(geometry, levelMat);
 					scene.add(level);
 				}, null);
 
@@ -131,15 +162,15 @@
 					pathfinder.setZoneData('level', zoneNodes);
 
 					const navWireframe = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-						color: 'white',
+						color: 0x808080,
 						wireframe: true
 					}));
-					navWireframe.position.y = 0.01;
+					navWireframe.position.y = OFFSET / 2;
 					scene.add(navWireframe);
 
 					var mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-						color: 0xd79fd4,
-						opacity: 0.5,
+						color: Color.NAVMESH,
+						opacity: 0.75,
 						transparent: true
 					}));
 
@@ -150,16 +181,17 @@
 
 				}, null);
 
-				// Add test sphere
+				// Player
 				var geometry = new THREE.SphereGeometry( 0.25, 32, 32 );
-				var material = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+				var material = new THREE.MeshBasicMaterial( {color: Color.PLAYER} );
 				player = new THREE.Mesh( geometry, material );
 				scene.add( player );
 
 				player.position.set(-3.5, 0.5, 5.5);
 
+				// Target
 				geometry = new THREE.BoxGeometry( 0.3, 0.3, 0.3 );
-				var material = new THREE.MeshBasicMaterial( {color: 0xff0000} );
+				var material = new THREE.MeshBasicMaterial( {color: Color.TARGET} );
 				target = new THREE.Mesh( geometry, material );
 				scene.add( target );
 
@@ -169,6 +201,8 @@
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				renderer.setClearColor(0xffffff);
+				renderer.gammaOutput = true;
+				renderer.gammaFactor = 2.2;
 				container.appendChild( renderer.domElement );
 
 				raycaster = new THREE.Raycaster();
@@ -225,7 +259,7 @@
 						}
 
 						var material = new THREE.LineBasicMaterial({
-							color: 0x0000ff,
+							color: Color.PATH,
 							linewidth: 2
 						});
 
@@ -234,7 +268,7 @@
 
 						// Draw debug lines
 						for (var i = 0; i < calculatedPath.length; i++) {
-							geometry.vertices.push(calculatedPath[i].clone().add(new THREE.Vector3(0, 0.2, 0)));
+							geometry.vertices.push(calculatedPath[i].clone().add(new THREE.Vector3(0, OFFSET, 0)));
 						}
 
 						pathLines = new THREE.Line( geometry, material );
@@ -244,10 +278,11 @@
 						var debugPath = [player.position].concat(calculatedPath);
 
 						for (var i = 0; i < debugPath.length - 1; i++) {
-							geometry = new THREE.BoxGeometry( 0.3, 0.3, 0.3 );
-							var material = new THREE.MeshBasicMaterial( {color: 0x00ffff} );
+							geometry = new THREE.SphereBufferGeometry( 0.08 );
+							var material = new THREE.MeshBasicMaterial( {color: Color.WAYPOINT} );
 							var node = new THREE.Mesh( geometry, material );
 							node.position.copy(debugPath[i]);
+							node.position.y += OFFSET;
 							pathLines.add( node );
 						}
 					} else {

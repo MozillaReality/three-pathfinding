@@ -53,7 +53,7 @@ Initializing the library, creating a level, and finding a path:
 // ES6
 import { Pathfinding } from 'three-pathfinding';
 // CommonJS
-const Pathfinding = require('three-pathfinding').Pathfinding;
+const { Pathfinding } = require('three-pathfinding');
 // UMD
 const Pathfinding = window.threePathfinding.Pathfinding;
 
@@ -77,7 +77,7 @@ npm install
 npm run dev
 ```
 
-The demo will start at http://localhost:9966/demo/demo.html.
+The demo will start at http://localhost:9966/demo/.
 
 ## API
 
@@ -120,6 +120,7 @@ Returns closest node group ID for given position.
 
 -   `zoneID` **[string][12]** 
 -   `position` **THREE.Vector3** 
+-   `checkPolygon`   (optional, default `false`)
 
 Returns **[number][14]** 
 
