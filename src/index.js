@@ -161,12 +161,11 @@ class Pathfinding {
  */
 Pathfinding.prototype.getGroup = (function () {
 	const plane = new THREE.Plane();
-	const point = new THREE.Vector3();
 	return function (zoneID, position, checkPolygon = false) {
 		if (!this.zones[zoneID]) return null;
 
 		let closestNodeGroup = null;
-		let distance = Math.pow(50, 2);
+		let distance = Infinity;
 		const zone = this.zones[zoneID];
 
 		for (let i = 0; i < zone.groups.length; i++) {
