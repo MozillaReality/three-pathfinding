@@ -161,7 +161,7 @@ class Pathfinding {
  */
 Pathfinding.prototype.getGroup = (function () {
 	const plane = new THREE.Plane();
-	return function (zoneID, position, checkPolygon = false) {
+	return function (zoneID, position, checkPolygon = false, projectPoint = false) {
 		if (!this.zones[zoneID]) return null;
 
 		let closestNodeGroup = null;
@@ -177,14 +177,19 @@ Pathfinding.prototype.getGroup = (function () {
 						zone.vertices[node.vertexIds[1]],
 						zone.vertices[node.vertexIds[2]]
 					);
-					if (Math.abs(plane.distanceToPoint(position)) < 0.0001) {
+					const distanceToPlane = Math.abs(plane.distanceToPoint(position));
+					if (projectPoint || distanceToPlane < 0.0001) {
 						const poly = [
 							zone.vertices[node.vertexIds[0]],
 							zone.vertices[node.vertexIds[1]],
 							zone.vertices[node.vertexIds[2]]
 						];
+						// isPointInPoly effectively projects the point onto the poly before checking containment.
 						if(Utils.isPointInPoly(poly, position)) {
-							return i;
+							if (distanceToPlane < distance) {
+								closestNodeGroup = i;
+								distance = distanceToPlane;
+							}
 						}
 					}
 				}
