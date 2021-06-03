@@ -1,216 +1,14 @@
+import { BufferAttribute, BufferGeometry } from 'three';
+
 class Utils {
 
-  static computeCentroids (geometry) {
-    var f, fl, face;
-
-    for ( f = 0, fl = geometry.faces.length; f < fl; f ++ ) {
-
-      face = geometry.faces[ f ];
-      face.centroid = new THREE.Vector3( 0, 0, 0 );
-
-      face.centroid.add( geometry.vertices[ face.a ] );
-      face.centroid.add( geometry.vertices[ face.b ] );
-      face.centroid.add( geometry.vertices[ face.c ] );
-      face.centroid.divideScalar( 3 );
-
-    }
-  }
-
   static roundNumber (value, decimals) {
-    return Number(value.toFixed(decimals));
+    const factor = Math.pow(10, decimals);
+    return Math.round(value * factor) / factor;
   }
 
   static sample (list) {
     return list[Math.floor(Math.random() * list.length)];
-  }
-
-  static mergeVertexIds (aList, bList) {
-
-    var sharedVertices = [];
-
-    aList.forEach((vID) => {
-      if (bList.indexOf(vID) >= 0) {
-        sharedVertices.push(vID);
-      }
-    });
-
-    if (sharedVertices.length < 2) return [];
-
-    if (sharedVertices.includes(aList[0]) && sharedVertices.includes(aList[aList.length - 1])) {
-      // Vertices on both edges are bad, so shift them once to the left
-      aList.push(aList.shift());
-    }
-
-    if (sharedVertices.includes(bList[0]) && sharedVertices.includes(bList[bList.length - 1])) {
-      // Vertices on both edges are bad, so shift them once to the left
-      bList.push(bList.shift());
-    }
-
-    // Again!
-    sharedVertices = [];
-
-    aList.forEach((vId) => {
-      if (bList.includes(vId)) {
-        sharedVertices.push(vId);
-      }
-    });
-
-    var clockwiseMostSharedVertex = sharedVertices[1];
-    var counterClockwiseMostSharedVertex = sharedVertices[0];
-
-
-    var cList = aList.slice();
-    while (cList[0] !== clockwiseMostSharedVertex) {
-      cList.push(cList.shift());
-    }
-
-    var c = 0;
-
-    var temp = bList.slice();
-    while (temp[0] !== counterClockwiseMostSharedVertex) {
-      temp.push(temp.shift());
-
-      if (c++ > 10) throw new Error('Unexpected state');
-    }
-
-    // Shave
-    temp.shift();
-    temp.pop();
-
-    cList = cList.concat(temp);
-
-    return cList;
-  }
-
-  static setPolygonCentroid (polygon, navigationMesh) {
-    var sum = new THREE.Vector3();
-
-    var vertices = navigationMesh.vertices;
-
-    polygon.vertexIds.forEach((vId) => {
-      sum.add(vertices[vId]);
-    });
-
-    sum.divideScalar(polygon.vertexIds.length);
-
-    polygon.centroid.copy(sum);
-  }
-
-  static cleanPolygon (polygon, navigationMesh) {
-
-    var newVertexIds = [];
-
-    var vertices = navigationMesh.vertices;
-
-    for (var i = 0; i < polygon.vertexIds.length; i++) {
-
-      var vertex = vertices[polygon.vertexIds[i]];
-
-      var nextVertexId, previousVertexId;
-      var nextVertex, previousVertex;
-
-      if (i === 0) {
-        nextVertexId = polygon.vertexIds[1];
-        previousVertexId = polygon.vertexIds[polygon.vertexIds.length - 1];
-      } else if (i === polygon.vertexIds.length - 1) {
-        nextVertexId = polygon.vertexIds[0];
-        previousVertexId = polygon.vertexIds[polygon.vertexIds.length - 2];
-      } else {
-        nextVertexId = polygon.vertexIds[i + 1];
-        previousVertexId = polygon.vertexIds[i - 1];
-      }
-
-      nextVertex = vertices[nextVertexId];
-      previousVertex = vertices[previousVertexId];
-
-      var a = nextVertex.clone().sub(vertex);
-      var b = previousVertex.clone().sub(vertex);
-
-      var angle = a.angleTo(b);
-
-      if (angle > Math.PI - 0.01 && angle < Math.PI + 0.01) {
-
-        // Remove the neighbours who had this vertex
-        var goodNeighbours = [];
-        polygon.neighbours.forEach((neighbour) => {
-          if (!neighbour.vertexIds.includes(polygon.vertexIds[i])) {
-            goodNeighbours.push(neighbour);
-          }
-        });
-        polygon.neighbours = goodNeighbours;
-
-
-        // TODO cleanup the list of vertices and rebuild vertexIds for all polygons
-      } else {
-        newVertexIds.push(polygon.vertexIds[i]);
-      }
-
-    }
-
-    polygon.vertexIds = newVertexIds;
-
-    this.setPolygonCentroid(polygon, navigationMesh);
-
-  }
-
-  static isConvex (polygon, navigationMesh) {
-
-    var vertices = navigationMesh.vertices;
-
-    if (polygon.vertexIds.length < 3) return false;
-
-    var convex = true;
-
-    var total = 0;
-
-    var results = [];
-
-    for (var i = 0; i < polygon.vertexIds.length; i++) {
-
-      var vertex = vertices[polygon.vertexIds[i]];
-
-      var nextVertex, previousVertex;
-
-      if (i === 0) {
-        nextVertex = vertices[polygon.vertexIds[1]];
-        previousVertex = vertices[polygon.vertexIds[polygon.vertexIds.length - 1]];
-      } else if (i === polygon.vertexIds.length - 1) {
-        nextVertex = vertices[polygon.vertexIds[0]];
-        previousVertex = vertices[polygon.vertexIds[polygon.vertexIds.length - 2]];
-      } else {
-        nextVertex = vertices[polygon.vertexIds[i + 1]];
-        previousVertex = vertices[polygon.vertexIds[i - 1]];
-      }
-
-      var a = nextVertex.clone().sub(vertex);
-      var b = previousVertex.clone().sub(vertex);
-
-      var angle = a.angleTo(b);
-      total += angle;
-
-      if (angle === Math.PI || angle === 0) return false;
-
-      var r = a.cross(b).y;
-      results.push(r);
-    }
-
-    // if ( total > (polygon.vertexIds.length-2)*Math.PI ) return false;
-
-    results.forEach((r) => {
-      if (r === 0) convex = false;
-    });
-
-    if (results[0] > 0) {
-      results.forEach((r) => {
-        if (r < 0) convex = false;
-      });
-    } else {
-      results.forEach((r) => {
-        if (r > 0) convex = false;
-      });
-    }
-
-    return convex;
   }
 
   static distanceToSquared (a, b) {
@@ -264,6 +62,83 @@ class Utils {
 
   static vequal (a, b) {
     return this.distanceToSquared(a, b) < 0.00001;
+  }
+
+  /**
+   * Modified version of BufferGeometryUtils.mergeVertices, ignoring vertex
+   * attributes other than position.
+   *
+   * @param {THREE.BufferGeometry} geometry
+   * @param {number} tolerance
+   * @return {THREE.BufferGeometry>}
+   */
+  static mergeVertices (geometry, tolerance = 1e-4) {
+
+    tolerance = Math.max( tolerance, Number.EPSILON );
+
+    // Generate an index buffer if the geometry doesn't have one, or optimize it
+    // if it's already available.
+    var hashToIndex = {};
+    var indices = geometry.getIndex();
+    var positions = geometry.getAttribute( 'position' );
+    var vertexCount = indices ? indices.count : positions.count;
+
+    // Next value for triangle indices.
+    var nextIndex = 0;
+
+    var newIndices = [];
+    var newPositions = [];
+
+    // Convert the error tolerance to an amount of decimal places to truncate to.
+    var decimalShift = Math.log10( 1 / tolerance );
+    var shiftMultiplier = Math.pow( 10, decimalShift );
+
+    for ( var i = 0; i < vertexCount; i ++ ) {
+
+      var index = indices ? indices.getX( i ) : i;
+
+      // Generate a hash for the vertex attributes at the current index 'i'.
+      var hash = '';
+
+      // Double tilde truncates the decimal value.
+      hash += `${ ~ ~ ( positions.getX( index ) * shiftMultiplier ) },`;
+      hash += `${ ~ ~ ( positions.getY( index ) * shiftMultiplier ) },`;
+      hash += `${ ~ ~ ( positions.getZ( index ) * shiftMultiplier ) },`;
+
+      // Add another reference to the vertex if it's already
+      // used by another index.
+      if ( hash in hashToIndex ) {
+
+        newIndices.push( hashToIndex[ hash ] );
+
+      } else {
+
+        newPositions.push( positions.getX( index ) );
+        newPositions.push( positions.getY( index ) );
+        newPositions.push( positions.getZ( index ) );
+
+        hashToIndex[ hash ] = nextIndex;
+        newIndices.push( nextIndex );
+        nextIndex ++;
+
+      }
+
+    }
+
+    // Construct merged BufferGeometry.
+
+    const positionAttribute = new BufferAttribute(
+      new Float32Array( newPositions ),
+      positions.itemSize,
+      positions.normalized
+    );
+
+    const result = new BufferGeometry();
+    result.setAttribute( 'position', positionAttribute );
+    result.setIndex( newIndices );
+
+    return result;
+
   }
 }
 

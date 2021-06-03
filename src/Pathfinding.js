@@ -1,4 +1,8 @@
-/* global THREE */
+import {
+	Vector3,
+	Plane,
+	Triangle,
+} from 'three';
 
 import { Utils } from './Utils';
 import { AStar } from './AStar';
@@ -15,19 +19,12 @@ class Pathfinding {
 
 	/**
 	 * (Static) Builds a zone/node set from navigation mesh geometry.
-	 * @param  {THREE.BufferGeometry} geometry
+	 * @param  {BufferGeometry} geometry
+	 * @param  {number} tolerance Vertex welding tolerance.
 	 * @return {Zone}
 	 */
-	static createZone (geometry) {
-		if ( geometry.isGeometry ) {
-			// Haven't actually implemented support for BufferGeometry yet, but Geometry is somewhat
-			// not-recommended these days, so go ahead and start warning.
-			console.warn('[three-pathfinding]: Use THREE.BufferGeometry, not THREE.Geometry, to create zone.');
-		} else {
-			geometry = new THREE.Geometry().fromBufferGeometry(geometry);
-		}
-
-		return Builder.buildZone(geometry);
+	static createZone (geometry, tolerance = 1e-4) {
+		return Builder.buildZone(geometry, tolerance);
 	}
 
 	/**
@@ -43,13 +40,13 @@ class Pathfinding {
 	 * Returns a random node within a given range of a given position.
 	 * @param  {string} zoneID
 	 * @param  {number} groupID
-	 * @param  {THREE.Vector3} nearPosition
+	 * @param  {Vector3} nearPosition
 	 * @param  {number} nearRange
 	 * @return {Node}
 	 */
 	getRandomNode (zoneID, groupID, nearPosition, nearRange) {
 
-		if (!this.zones[zoneID]) return new THREE.Vector3();
+		if (!this.zones[zoneID]) return new Vector3();
 
 		nearPosition = nearPosition || null;
 		nearRange = nearRange || 0;
@@ -67,12 +64,12 @@ class Pathfinding {
 			}
 		});
 
-		return Utils.sample(candidates) || new THREE.Vector3();
+		return Utils.sample(candidates) || new Vector3();
 	}
 
 	/**
 	 * Returns the closest node to the target position.
-	 * @param  {THREE.Vector3} position
+	 * @param  {Vector3} position
 	 * @param  {string}  zoneID
 	 * @param  {number}  groupID
 	 * @param  {boolean} checkPolygon
@@ -100,11 +97,11 @@ class Pathfinding {
 	 * Returns a path between given start and end points. If a complete path
 	 * cannot be found, will return the nearest endpoint available.
 	 *
-	 * @param  {THREE.Vector3} startPosition Start position.
-	 * @param  {THREE.Vector3} targetPosition Destination.
+	 * @param  {Vector3} startPosition Start position.
+	 * @param  {Vector3} targetPosition Destination.
 	 * @param  {string} zoneID ID of current zone.
 	 * @param  {number} groupID Current group ID.
-	 * @return {Array<THREE.Vector3>} Array of points defining the path.
+	 * @return {Array<Vector3>} Array of points defining the path.
 	 */
 	findPath (startPosition, targetPosition, zoneID, groupID) {
 		const nodes = this.zones[zoneID].groups[groupID];
@@ -147,7 +144,7 @@ class Pathfinding {
 		channel.stringPull();
 
 		// Return the path, omitting first position (which is already known).
-		const path = channel.path.map((c) => new THREE.Vector3(c.x, c.y, c.z));
+		const path = channel.path.map((c) => new Vector3(c.x, c.y, c.z));
 		path.shift();
 		return path;
 	}
@@ -156,11 +153,11 @@ class Pathfinding {
 /**
  * Returns closest node group ID for given position.
  * @param  {string} zoneID
- * @param  {THREE.Vector3} position
+ * @param  {Vector3} position
  * @return {number}
  */
 Pathfinding.prototype.getGroup = (function() {
-	const plane = new THREE.Plane();
+	const plane = new Plane();
 	return function (zoneID, position, checkPolygon = false) {
 		if (!this.zones[zoneID]) return null;
 
@@ -204,23 +201,23 @@ Pathfinding.prototype.getGroup = (function() {
  * Clamps a step along the navmesh, given start and desired endpoint. May be
  * used to constrain first-person / WASD controls.
  *
- * @param  {THREE.Vector3} start
- * @param  {THREE.Vector3} end Desired endpoint.
+ * @param  {Vector3} start
+ * @param  {Vector3} end Desired endpoint.
  * @param  {Node} node
  * @param  {string} zoneID
  * @param  {number} groupID
- * @param  {THREE.Vector3} endTarget Updated endpoint.
+ * @param  {Vector3} endTarget Updated endpoint.
  * @return {Node} Updated node.
  */
 Pathfinding.prototype.clampStep = (function () {
-	const point = new THREE.Vector3();
-	const plane = new THREE.Plane();
-	const triangle = new THREE.Triangle();
+	const point = new Vector3();
+	const plane = new Plane();
+	const triangle = new Triangle();
 
-	const endPoint = new THREE.Vector3();
+	const endPoint = new Vector3();
 
 	let closestNode;
-	let closestPoint = new THREE.Vector3();
+	let closestPoint = new Vector3();
 	let closestDistance;
 
 	return function (startRef, endRef, node, zoneID, groupID, endTarget) {
@@ -260,7 +257,7 @@ Pathfinding.prototype.clampStep = (function () {
 				closestDistance = point.distanceToSquared(endPoint);
 			}
 
-			const depth = nodeDepth[currentNode];
+			const depth = nodeDepth[currentNode.id];
 			if (depth > 2) continue;
 
 			for (let i = 0; i < currentNode.neighbours.length; i++) {
@@ -282,7 +279,7 @@ Pathfinding.prototype.clampStep = (function () {
  *
  * @type {Object}
  * @property {Array<Group>} groups
- * @property {Array<THREE.Vector3} vertices
+ * @property {Array<Vector3>} vertices
  */
 const Zone = {}; // jshint ignore:line
 
@@ -299,8 +296,8 @@ const Group = {}; // jshint ignore:line
  * @type {Object}
  * @property {number} id
  * @property {Array<number>} neighbours IDs of neighboring nodes.
- * @property {Array<number} vertexIds
- * @property {THREE.Vector3} centroid
+ * @property {Array<number>} vertexIds
+ * @property {Vector3} centroid
  * @property {Array<Array<number>>} portals Array of portals, each defined by two vertex IDs.
  * @property {boolean} closed
  * @property {number} cost
